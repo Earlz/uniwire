@@ -18,6 +18,8 @@ These are what this should accomplish:
 
 ## Data format
 
+All data (including packet headers) is sent as 9 bit bytes. The last bit should be the opposite of whatever the last bit in the data byte is. In case of length corruption, this helps to identify when the slave device is done sending a message. 
+
 Data is not encoded in any special way, it is just bits written to the line. No manchester encoding or anything special. Due to the clock calibration step, this should not present any problems. In dynamic environments where clockrates my change, such as in drastically different temperatures, all devices should recalibrate their clock to the master clock every X number of messages
 
 List of states that the protocol goes through(?)
@@ -50,10 +52,59 @@ Format:
 
 ### Query Devices
 
+Determine what devices exist
 
-## Master data
+Packet xfer for retransmission and error checking
+
+1. Packet sent from master to request "does device X" exist, where X is 0 to 128
+2. Wait for ACK
+3. Packet sent from slave to indicate presence and any additional information
+4. Master moves on to next slave ID
 
 
+# Packet format
 
+Packets have a specific format and can transmit up to 255 bytes at a time. If the length field is set to 256, then 256 bytes are transmitted, but also this tells master that there is additional information that is waiting to be sent from the slave. This can also be used from the master, though is probably less useful for slaves to know. 
 
-## Slave data
+Format:
+
+0. Clock calibration pulses (not recorded)
+0. Type (top 4 bits)
+0. checksum of length and type (4 bits)
+0. Length in bytes (1 byte)
+0. data (variable)
+0. CRC checksum of entire packet (not counting calibration) (2 bytes)
+0. release channel to low for 1 cycle (so that next clock sync packet is identifiable)
+
+The various types of packets determine the data format
+
+0x00: plain data
+
+Plain data, broadcast for every device to make use of. 
+
+0x01: (from master) Device query
+
+A device query packet. To save tranmission and initialization times, this is cut as short as possible. The length field is set to the device ID being requested, and the data has a length of 0. IF the bottom bit of the Type byte is set, it is treated as a device query packet
+
+0x02: (from slave only) Query response
+
+A message to the master to indicate that the device exists. Length can optionally be a non-zero value to indicate additional information: (TBD)
+
+0x03: (from master only) Slave OK To Send
+
+Another special packet where the length field is actually the device ID. This is a message from the master to tell a host that it should send whatever data it needs
+
+0x 04: Acknowledge
+
+A special packet that drops everything down to a more simplistic format. 
+
+0. type (4 bits)
+1. checksum of next field and type (4 bits)
+2. From device ID (byte)
+
+This should be sent in a few different ways
+
+1. When a slave sends any message, the master should send an ACK afterwards
+2. When a master sends a message to a particular slave, the slave should send an ACK
+3. When a slave sends a message directed to another particular slave, the master should send an ACK, and afterwards the receiving device should send an ACK
+4. When the master sends a message to all slaves, 
