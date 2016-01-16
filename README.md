@@ -73,28 +73,29 @@ Format:
 0. checksum of length and type (4 bits)
 0. Length in bytes (1 byte)
 0. data (variable)
-0. CRC checksum of entire packet (not counting calibration) (2 bytes)
+0. attempt number (byte) 
+0. CRC checksum of entire packet (not counting calibration) (1 byte) (excluded if data length is 0)
 0. release channel to low for 1 cycle (so that next clock sync packet is identifiable)
 
 The various types of packets determine the data format
 
-0x00: plain data
+0x00: broadcast plain data
 
-Plain data, broadcast for every device to make use of. 
+Plain data, broadcast for every device to make use of. If the top bit of this type is set, then it isconsidered non-durable, and does not need ACK or Error responses
 
 0x01: (from master) Device query
 
-A device query packet. To save tranmission and initialization times, this is cut as short as possible. The length field is set to the device ID being requested, and the data has a length of 0. IF the bottom bit of the Type byte is set, it is treated as a device query packet
+A device query packet. To save tranmission and initialization times, this is cut as short as possible. The length field is set to the device ID being requested, and the data has a length of 0. IF the bottom bit of the Type byte is set, it is treated as a device query packet. 
 
 0x02: (from slave only) Query response
 
 A message to the master to indicate that the device exists. Length can optionally be a non-zero value to indicate additional information: (TBD)
 
-0x03: (from master only) Slave OK To Send
+0x0E: (from master only) Slave OK To Send
 
-Another special packet where the length field is actually the device ID. This is a message from the master to tell a host that it should send whatever data it needs
+Another special packet where the length field is actually the device ID. This is a message from the master to tell a host that it should send whatever data it needs. Non durable
 
-0x 04: Acknowledge
+0x0D: Acknowledge
 
 A special packet that drops everything down to a more simplistic format. 
 
@@ -107,4 +108,22 @@ This should be sent in a few different ways
 1. When a slave sends any message, the master should send an ACK afterwards
 2. When a master sends a message to a particular slave, the slave should send an ACK
 3. When a slave sends a message directed to another particular slave, the master should send an ACK, and afterwards the receiving device should send an ACK
-4. When the master sends a message to all slaves, 
+4. When the master sends a message to all slaves, to ensure that the message was not corrupted, an ack should be sent from the lowest device ID on the network followed by one from the highest device ID on the network. 
+
+ACK is not to be sent if the top bit of the type is set, to indicate non-durable. It is recommended that if a durable packet is sent and has errors, the master should request a resend. 
+
+Non durable
+
+0x0F: Error
+
+A special packet that indicates an error was encountered with the last packet. This should only be sent by a slave that was sent a message particularly for it's ID, or by the master. The top bit of this type is set to indicate that it is non-durable. If there is an error receiving an error packet, then well. there's problems that are complicated. 
+
+It uses the same format as ACK
+
+0x03: Message to
+
+Sends a message to a particular device ID. Can be sent from and to either master or slave. Length must be greater than 1 and the first byte of the data is th device ID
+
+0x04: Change protocol (master only)
+
+Indicates that it wil attempt to change the communication speed or other options(TBD). This is performd by the master sending 4 ACK packets complete with clock calibration prefixes. After this process, the master will set the line HIGH for 9 cyles, and then wait for 9 cycles at the OLD SPEED. If during this time any device can't handle this new speed, then it should set the line high for at least 4 cycles during this time. 
