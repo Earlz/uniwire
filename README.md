@@ -100,15 +100,14 @@ Another special packet where the length field is actually the device ID. This is
 A special packet that drops everything down to a more simplistic format. 
 
 0. type (4 bits)
-1. checksum of next field and type (4 bits)
-2. From device ID (byte)
+1. checksum of type (4 bits)
 
 This should be sent in a few different ways
 
 1. When a slave sends any message, the master should send an ACK afterwards
 2. When a master sends a message to a particular slave, the slave should send an ACK
 3. When a slave sends a message directed to another particular slave, the master should send an ACK, and afterwards the receiving device should send an ACK
-4. When the master sends a message to all slaves, to ensure that the message was not corrupted, an ack should be sent from the lowest device ID on the network followed by one from the highest device ID on the network. 
+4. When the master sends a message to all slaves, to ensure that the message was not corrupted, an ack should be sent from the lowest device ID on the network. 
 
 ACK is not to be sent if the top bit of the type is set, to indicate non-durable. It is recommended that if a durable packet is sent and has errors, the master should request a resend. 
 
@@ -127,3 +126,5 @@ Sends a message to a particular device ID. Can be sent from and to either master
 0x04: Change protocol (master only)
 
 Indicates that it wil attempt to change the communication speed or other options(TBD). This is performd by the master sending 4 ACK packets complete with clock calibration prefixes. After this process, the master will set the line HIGH for 9 cyles, and then wait for 9 cycles at the OLD SPEED. If during this time any device can't handle this new speed, then it should set the line high for at least 4 cycles during this time. 
+
+This is an optional feature of the protocol due to significant additional complexity
